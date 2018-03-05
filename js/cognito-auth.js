@@ -1,36 +1,41 @@
 /*global WildRydes _config AmazonCognitoIdentity AWSCognito*/
 
-var Login = window.Login || {};
+var auth = window.auth || {};
 
-(function scopeWrapper($) {
+var config = window._config || {};
+
+(function scopeWrapper() {
     var signinUrl = '/login.html';
 
+    var config = window._config;
     var poolData = {
-        UserPoolId: _config.cognito.userPoolId,
-        ClientId: _config.cognito.userPoolClientId
+        UserPoolId: config.cognito.userPoolId,
+        ClientId: config.cognito.userPoolClientId
     };
 
     var userPool;
 
-    if (!(_config.cognito.userPoolId &&
-            _config.cognito.userPoolClientId &&
-            _config.cognito.region)) {
-        // $('#noCognitoMessage').show();
+    if (!(config.cognito.userPoolId &&
+            config.cognito.userPoolClientId &&
+            config.cognito.region)) {
         console.error('User pool is not configured');
         return;
     }
 
     userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 
+    var currentUser;
+
     if (typeof AWSCognito !== 'undefined') {
-        AWSCognito.config.region = _config.cognito.region;
+        AWSCognito.config.region = config.cognito.region;
     }
 
-    Login.signOut = function signOut() {
+    auth.signOut = function signOut() {
         userPool.getCurrentUser().signOut();
+        window.location.href = 'login.html';
     };
 
-    Login.authToken = new Promise(function fetchCurrentAuthToken(resolve, reject) {
+    auth.authToken = new Promise(function fetchCurrentAuthToken(resolve, reject) {
         var cognitoUser = userPool.getCurrentUser();
 
         if (cognitoUser) {
@@ -48,8 +53,8 @@ var Login = window.Login || {};
         }
     });
 
-    Login.username = function username() {
-        userPool.getCurrentUser().getUsername();
+    auth.username = function username() {
+        return userPool.getCurrentUser().username;
     };
 
     /*
@@ -75,15 +80,26 @@ var Login = window.Login || {};
     }
 
     function signin(username, password, onSuccess, onFailure) {
+        console.log("u: " + username + "p: " + password);
         var authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
             Username: username,
             Password: password
         });
 
-        var cognitoUser = createCognitoUser(email);
+        var cognitoUser = createCognitoUser(username);
         cognitoUser.authenticateUser(authenticationDetails, {
             onSuccess: onSuccess,
-            onFailure: onFailure
+            onFailure: onFailure,
+            newPasswordRequired: function (userAttributes, requiredAttributes) {
+                console.log('New password required');
+                // console.log(userAttributes.stringify());
+                // console.log(requiredAttributes.stringify());
+                document.getElementById('signinForm').style.display = "none";
+                document.getElementById('usernameChangePassword').value = username;
+                let changepasswordForm = document.getElementById('changepasswordForm');
+                changepasswordForm.onsubmit = getChangePasswordHandler(cognitoUser, requiredAttributes)
+                changepasswordForm.style.display = "block";
+            }
         });
     }
 
@@ -95,6 +111,24 @@ var Login = window.Login || {};
                 onFailure(err);
             }
         });
+    }
+
+    function changePassword(cognitoUser, newPassword, requiredAttributes, onSuccess, onFailure) {
+        if(!currentUser) {
+            onFailure("Current user is not defined")
+        }
+        cognitoUser.completeNewPasswordChallenge(newPassword, {},
+            {
+                onSuccess: onSuccess,
+                onFailure: onFailure
+            }
+       /*     function confirmCallback(err, result) {
+                if (!err) {
+                    onSuccess(result);
+                } else {
+                    onFailure(err);
+                }
+        }*/);
     }
 
     function createCognitoUser(username) {
@@ -112,20 +146,23 @@ var Login = window.Login || {};
      *  Event Handlers
      */
 
-    $(function onDocReady() {
-        $('#signinForm').submit(handleSignin);
-        // $('#registrationForm').submit(handleRegister);
-        // $('#verifyForm').submit(handleVerify);
-    });
+    function onDocReady() {
+        let signinForm = document.getElementById('signinForm');
+        if (signinForm) {
+            signinForm.onsubmit =  handleSignin
+        }
+        // document.getElementById('registrationForm').onsubmit =  handleRegister;
+        // document.getElementById('verifyForm').onsubmit =  handleVerify;
+    }
+    document.addEventListener("DOMContentLoaded", onDocReady);
 
     function handleSignin(event) {
-        var username = $('#username').val();
-        var password = $('#password').val();
+        var username = document.getElementById('username').value;
+        var password = document.getElementById('password').value;
         event.preventDefault();
         signin(username, password,
             function signinSuccess() {
                 console.log('Successfully Logged In');
-                // window.localStorage.setItem('login', username);
                 window.location.href = 'index.html';
             },
             function signinError(err) {
@@ -134,15 +171,49 @@ var Login = window.Login || {};
         );
     }
 
+    function getChangePasswordHandler(cognitoUser, requiredAttributes) {
+        return function handleChangePassword(event) {
+            var user = document.getElementById('usernameChangePassword').value;
+            var password = document.getElementById('passwordInputChange').value;
+            var password2 = document.getElementById('password2InputChange').value;
+
+            var onSuccess = function changeSuccess(result) {
+                console.log('Successfully password changed');
+                window.location.href = 'index.html';
+
+
+                // signin(user, password,
+                //     function signinSuccess() {
+                //         console.log('Successfully Logged In');
+                //         window.location.href = 'index.html';
+                //     },
+                //     function signinError(err) {
+                //         alert(err);
+                //     }
+                // )
+            };
+            var onFailure = function changeFailure(err) {
+                alert(err);
+            };
+            event.preventDefault();
+
+            if (password === password2) {
+                changePassword(cognitoUser, password, requiredAttributes, onSuccess, onFailure);
+            } else {
+                alert('Passwords do not match');
+            }
+        };
+    }
+
     function handleRegister(event) {
-        var email = $('#emailInputRegister').val();
-        var password = $('#passwordInputRegister').val();
-        var password2 = $('#password2InputRegister').val();
+        var user = document.getElementById('username').value;
+        var password = document.getElementById('passwordInputRegister').value;
+        var password2 = document.getElementById('password2InputRegister').value;
 
         var onSuccess = function registerSuccess(result) {
             var cognitoUser = result.user;
             console.log('user name is ' + cognitoUser.getUsername());
-            var confirmation = ('Registration successful. Please check your email inbox or spam folder for your verification code.');
+            var confirmation = ('Registration successful. Please check your user inbox or spam folder for your verification code.');
             if (confirmation) {
                 window.location.href = 'verify.html';
             }
@@ -153,17 +224,17 @@ var Login = window.Login || {};
         event.preventDefault();
 
         if (password === password2) {
-            register(email, password, onSuccess, onFailure);
+            register(user, password, onSuccess, onFailure);
         } else {
             alert('Passwords do not match');
         }
     }
 
     function handleVerify(event) {
-        var email = $('#emailInputVerify').val();
-        var code = $('#codeInputVerify').val();
+        var user = document.getElementById('emailInputVerify').value;
+        var code = document.getElementById('codeInputVerify').value;
         event.preventDefault();
-        verify(email, code,
+        verify(user, code,
             function verifySuccess(result) {
                 console.log('call result: ' + result);
                 console.log('Successfully verified');
@@ -175,4 +246,6 @@ var Login = window.Login || {};
             }
         );
     }
-}(jQuery));
+
+
+}());
