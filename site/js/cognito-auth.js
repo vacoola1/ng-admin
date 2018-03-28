@@ -32,7 +32,7 @@ var config = window._config || {};
 
     auth.signOut = function signOut() {
         userPool.getCurrentUser().signOut();
-        window.location.href = 'login.html';
+        window.location.href = '../login.html';
     };
 
     auth.authToken = new Promise(function fetchCurrentAuthToken(resolve, reject) {
@@ -163,7 +163,7 @@ var config = window._config || {};
         signin(username, password,
             function signinSuccess() {
                 console.log('Successfully Logged In');
-                window.location.href = 'index.html';
+                window.location.href = '../index.html';
             },
             function signinError(err) {
                 alert(err);
@@ -179,7 +179,7 @@ var config = window._config || {};
 
             var onSuccess = function changeSuccess(result) {
                 console.log('Successfully password changed');
-                window.location.href = 'index.html';
+                window.location.href = '../index.html';
 
 
                 // signin(user, password,

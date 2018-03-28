@@ -1,0 +1,14 @@
+{
+  "name": "patron-lambda",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "zip -r patron-lambda.zip * -x *.zip *.log"
+  },
+  "engines": {
+    "node": "6.10"
+  },
+  "dependencies": {
+  },
+  "author": "vacoola"
+}
