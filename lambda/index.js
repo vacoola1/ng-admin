@@ -2,9 +2,7 @@
 
 console.log('Loading function');
 
-const doc = require('dynamodb-doc');
-
-const dynamo = new doc.DynamoDB();
+const memberClass = require('member');
 
 
 /**
@@ -18,34 +16,77 @@ const dynamo = new doc.DynamoDB();
  * DynamoDB API as a JSON body.
  */
 exports.handler = (event, context, callback) => {
+
     console.log('Received event:', JSON.stringify(event, null, 2));
 
-    const done = (err, res) => callback(null, {
+    const getEntityService = event => {
+        if ( event.resource.contains('/member') ) {
+            return new memberClass(event);
+        }
+    };
+
+    const getHandler = event => {
+
+        const entityService = getEntityService(event);
+
+        if (! entityService) {
+            return undefined
+        }
+
+        if ( event.httpMethod === 'GET' && event.pathParameters.id) {
+            return () => {
+                return entityService.get(event.pathParameters.id);
+            };
+        } else if ( event.httpMethod === 'GET') {
+            return () => {
+                return entityService.getAll();
+            };
+        } else if ( event.httpMethod === 'POST' && event.body) {
+            return () => {
+                return entityService.create(JSON.parse(event.body));
+            };
+        } else if ( event.httpMethod === 'PUT' && event.body) {
+            return () => {
+                return entityService.update(JSON.parse(event.body));
+            };
+        } else if ( event.httpMethod === 'DELETE' && event.pathParameters.id) {
+            return () => {
+                return entityService.remove(event.pathParameters.id);
+            };
+        } else {
+            return undefined
+        }
+    };
+
+    const sendData = (err, res) => callback(null, {
         statusCode: err ? '400' : '200',
         body: err ? err.message : JSON.stringify(res),
         headers: {
             'Content-Type': 'application/json',
-        },
+        }
     });
 
-    const done1 = (err, res) => callback(null, res.Items);
+    const sendError = err => callback(null, {
+        statusCode: '400',
+        body: err.message,
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    });
 
-    switch (event.httpMethod) {
-        case 'DELETE':
-            dynamo.deleteItem(JSON.parse(event.body), done);
-            break;
-        case 'GET':
-            dynamo.scan({ TableName: 'pobratimy-prod' }, done);
-            break;
-        case 'POST':
-            dynamo.putItem(JSON.parse(event.body), done);
-            break;
-        case 'PUT':
-            dynamo.updateItem(JSON.parse(event.body), done);
-            break;
-        default:
-            dynamo.scan({ TableName: 'pobratimy-prod' }, done);
+    const entityHandler = getHandler(event);
 
-        // done(new Error(`Unsupported method "${JSON.stringify(event)}"`));
+    if (entityHandler) {
+        entityHandler()
+            .then( data => sendData(data))
+            .catch( err => {
+                console.error(err);
+                sendError(err)
+            });
+    } else {
+        const err = new Error(`Unsupported request "${JSON.stringify(event)}"`);
+        console.error(err);
+        sendError(err)
     }
+
 };

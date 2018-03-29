@@ -9,6 +9,8 @@
     "node": "6.10"
   },
   "dependencies": {
+    "build": "^0.1.4",
+    "q": "^1.5.1"
   },
   "author": "vacoola"
 }
