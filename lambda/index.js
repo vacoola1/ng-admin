@@ -20,7 +20,7 @@ exports.handler = (event, context, callback) => {
     console.log('Received event:', JSON.stringify(event, null, 2));
 
     const getEntityService = event => {
-        if ( event.resource.contains('/member') ) {
+        if ( event.resource.includes('/member') ) {
             return new memberClass(event);
         }
     };
@@ -33,7 +33,7 @@ exports.handler = (event, context, callback) => {
             return undefined
         }
 
-        if ( event.httpMethod === 'GET' && event.pathParameters.id) {
+        if ( event.httpMethod === 'GET' && event.pathParameters && event.pathParameters.id) {
             return () => {
                 return entityService.get(event.pathParameters.id);
             };
@@ -49,7 +49,7 @@ exports.handler = (event, context, callback) => {
             return () => {
                 return entityService.update(JSON.parse(event.body));
             };
-        } else if ( event.httpMethod === 'DELETE' && event.pathParameters.id) {
+        } else if ( event.httpMethod === 'DELETE' && event.pathParameters && event.pathParameters.id) {
             return () => {
                 return entityService.remove(event.pathParameters.id);
             };
@@ -58,9 +58,9 @@ exports.handler = (event, context, callback) => {
         }
     };
 
-    const sendData = (err, res) => callback(null, {
-        statusCode: err ? '400' : '200',
-        body: err ? err.message : JSON.stringify(res),
+    const sendData = data => callback(null, {
+        statusCode: '200',
+        body: JSON.stringify(data),
         headers: {
             'Content-Type': 'application/json',
         }

@@ -1,8 +1,7 @@
 'use strict';
 
-const doc = require('dynamodb-doc');
-const Q = require('q');
-const dynamo = new doc.DynamoDB();
+const AWS = require('aws-sdk');
+const dynamo = new AWS.DynamoDB();
 
 const configClass = require('config');
 
@@ -13,96 +12,65 @@ class member {
     }
 
     get(id) {
-        const deferred = Q.defer();
-
         let params = {
             Key: {
                 "id": {
-                    N: id
+                    S: id
                 }
             },
             TableName: this.table
         };
-
-        dynamo.getItem(params, (err, data) => {
-            if ( err ) {
-                return deferred.reject( err );
-            }
-            deferred.resolve( data );
-        });
+        return dynamo.getItem(params).promise()
+            .then( data => {
+                return data.Items
+            });
     }
 
     getAll() {
-        const deferred = Q.defer();
-        dynamo.scan({ TableName: this.table }, (err, data) => {
-            if ( err ) {
-                return deferred.reject( err );
-            }
-            deferred.resolve( data );
-        });
-        return deferred
+        return dynamo.scan({ TableName: this.table } ).promise()
+            .then( data => {
+                return data.Items
+            });
     }
 
     create(entity) {
-        const deferred = Q.defer();
-
         entity.id = "";
         let params = {
             Item: entity,
             TableName: this.table,
             ReturnValues: "UPDATED_NEW"
         };
-
-        dynamo.putItem(params, (err, data) => {
-            if ( err ) {
-                return deferred.reject( err );
-            }
-            deferred.resolve( data );
-        });
-
-        return deferred
+        return dynamo.putItem(params).promise()
+            .then( data => {
+                return data.Items
+            });
     }
 
     update(entity) {
-        const deferred = Q.defer();
-
-        entity.id = "";
         let params = {
             Item: entity,
             TableName: this.table,
             ReturnValues: "UPDATED_NEW"
         };
-
-        dynamo.updateItem(params, (err, data) => {
-            if ( err ) {
-                return deferred.reject( err );
-            }
-            deferred.resolve( data );
-        });
-
-        return deferred
+        return dynamo.updateItem(params).promise()
+            .then( data => {
+                return data.Items
+            });
     }
 
     remove(id) {
-        const deferred = Q.defer();
-
         let params = {
             Key: {
                 "id": {
-                    N: id
+                    S: id
                 }
             },
             TableName: this.table
         };
-
-        dynamo.deleteItem(params, (err, data) => {
-            if ( err ) {
-                return deferred.reject( err );
-            }
-            deferred.resolve( data );
-        });
-
-        return deferred
+        return dynamo.deleteItem(params).promise()
+            .then( data => {
+                return data.Items
+            });
     }
 }
 
