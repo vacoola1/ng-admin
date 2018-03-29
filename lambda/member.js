@@ -1,11 +1,14 @@
 'use strict';
 
 const AWS = require('aws-sdk');
-const dynamo = new AWS.DynamoDB();
+const dynamo = new AWS.DynamoDB.DocumentClient();
+
+const uuidv1 = require('uuid/v1');
 
 const configClass = require('config');
 
 class member {
+
     constructor(event) {
         this.config = new configClass(event).getConfig();
         this.table = 'member' + this.config.db.tableEnv;
@@ -14,15 +17,17 @@ class member {
     get(id) {
         let params = {
             Key: {
-                "id": {
-                    S: id
-                }
+                "id": id
             },
             TableName: this.table
         };
-        return dynamo.getItem(params).promise()
+        return dynamo.get(params).promise()
             .then( data => {
-                return data.Items
+                if (data.Item) {
+                    return data.Item
+                } else {
+                    throw new Error(`There is no member with id = "${id}"`)
+                }
             });
     }
 
@@ -34,43 +39,44 @@ class member {
     }
 
     create(entity) {
-        entity.id = "";
+        let newId = uuidv1();
+        entity.id = newId;
         let params = {
             Item: entity,
-            TableName: this.table,
-            ReturnValues: "UPDATED_NEW"
+            TableName: this.table
         };
-        return dynamo.putItem(params).promise()
-            .then( data => {
-                return data.Items
-            });
+        return dynamo.put(params).promise()
+            .then( () => this.get(newId) );
     }
 
     update(entity) {
         let params = {
             Item: entity,
-            TableName: this.table,
-            ReturnValues: "UPDATED_NEW"
+            TableName: this.table
         };
-        return dynamo.updateItem(params).promise()
-            .then( data => {
-                return data.Items
-            });
+        return this.get(entity.id).then( () => {
+            return dynamo.put(params).promise()
+                .then( () => this.get(entity.id) )
+        });
     }
 
     remove(id) {
         let params = {
             Key: {
-                "id": {
-                    S: id
-                }
+                "id": id
             },
             TableName: this.table
         };
-        return dynamo.deleteItem(params).promise()
+        return this.get(id)
+            .then( dynamo.delete(params).promise() )
+            .then( dynamo.get(params).promise() )
             .then( data => {
-                return data.Items
-            });
+                if (data.Item) {
+                    throw new Error(`Мember with id = "${id} was not deleted"`)
+                } else {
+                    return {}
+                }
+            })
     }
 }
 
