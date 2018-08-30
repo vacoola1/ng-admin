@@ -21,14 +21,15 @@ myApp.config(['NgAdminConfigurationProvider', function (nga) {
         .baseApiUrl(config.api.invokeUrl); // main API endpoint
     // create a user entity
     // the API endpoint for this entity will be 'http://jsonplaceholder.typicode.com/users/:id
-    var participate = nga.entity('member');
+    var member = nga.entity('member');
     // set the fields of the user entity list view
-    participate.listView().fields([
+    member.listView().fields([
+        nga.field('id'),
         nga.field('name'),
         nga.field('email')
     ]);
     // add the user entity to the admin application
-    admin.addEntity(participate);
+    admin.addEntity(member);
     // attach the admin application to the DOM and execute it
 
     let username = auth.username();
